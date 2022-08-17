@@ -42,9 +42,7 @@ def send_message(link, chat_id, text='Default text of the message.'):
     requests.post(link + 'sendMessage', json=param)
 
 
-app = Flask(__name__)
-
-# getting token, server and SSL info from config.ini
+# configs parsing
 config = configparser.ConfigParser()
 config.sections()
 config.read('config.ini')
@@ -53,31 +51,47 @@ address = config['server']['address']
 port = config['server']['port']
 public_key = config['ssl']['public_key']
 private_key = config['ssl']['private_key']
+report_chat_id = config['errors']['report_chat_id']
 
 # inserting tg bot token to API link
 url = f'https://api.telegram.org/bot{token}/'
 
+app = Flask(__name__)
+
+
 @app.route('/', methods=['POST', 'GET'])
 def index():
-    global address
-    global bot_standby
-
     # standard messages
-    welcome_message = ('Привет!')
-    goodbye_message = ('Пока.')
+    welcome_message = 'Привет!'
+    goodbye_message = 'Пока.'
     help_message = 'Начни вводить "/", появится список команд.'
     why_message = ('Создаёшь компанию и не знаешь, как назвать? 🤨\n\n'
                    'Наверняка часто замечаешь названия в стиле РемСнабПром или КапЭнергоКомплект.\n\n'
-                   'Лучшие дельцы создавали имена своих контор с этим ботом. Отвечаю. 😎\n'
-                   'Иначе откуда такой безумный суп из слов, который сложно запомнить?\n\n'
+                   'Лучшие дельцы дали название своим конторам с этим ботом. Отвечаю. 😎\n'
+                   'Иначе откуда такой безумный суп из слов, которые невозможно запомнить?\n\n'
                    'Пользуйся. Не благодари.')
-    #
+    clarify_message = ('Тебе нужно имя для комании?\n'
+                       'Жми /new_name.')
+    report_message = '**Unexpected event**\nTake a look:\n\n'
+
+    # read webhook
     if request.method == 'POST':
         r = request.get_json()
-        chat_id = r['message']['chat']['id']
-        message = r['message']['text']
+        # check events
+        try:
+            # expected event
+            chat_id = r['message']['chat']['id']
+            message = r['message']['text']
+        except:
+            # unexpected event
+            chat_id = int(report_chat_id)
+            for item in r:
+                send_message(url,
+                             chat_id,
+                             report_message + item)
+            return 'bug reported', 200
+        # check messages
         if message == '/start':
-            bot_standby = True
             send_message(url, chat_id, welcome_message)
             return 'success', 200
         elif message == '/new_name':
@@ -89,11 +103,10 @@ def index():
             option_2 = name_gen(words)
             option_3 = name_gen(words)
             options = (f'Вот несколько вариантов:\n'
-                        f'1. {option_1}\n'
-                        f'2. {option_2}\n'
-                        f'3. {option_3}')
+                       f'1. {option_1}\n'
+                       f'2. {option_2}\n'
+                       f'3. {option_3}')
             send_message(url, chat_id, options)
-            send_message(url, chat_id, 'Не благодари.')
             return 'success - names are generated', 200
         elif message == '/help':
             send_message(url, chat_id, help_message)
@@ -102,13 +115,10 @@ def index():
             send_message(url, chat_id, why_message)
             return 'success - help message is sent', 200
         elif message == '/stop':
-            bot_standby = False
             send_message(url, chat_id, goodbye_message)
             return 'success - bot stoped', 200
         else:
-            clarify = ('Тебе нужно имя для комании?\n'
-                        'Жми /new_name.')
-            send_message(url, chat_id, clarify)
+            send_message(url, chat_id, clarify_message)
             return 'success - other respond is send', 200
 
 
