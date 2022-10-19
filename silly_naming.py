@@ -86,9 +86,11 @@ def index():
             # unexpected event
             chat_id = int(report_chat_id)
             for item in r:
-                send_message(url,
-                             chat_id,
-                             report_message + item)
+                send_message(
+                    url,
+                    chat_id,
+                    report_message + item
+                )
             return 'bug reported', 200
         # check messages
         if message == '/start':
